@@ -1,4 +1,6 @@
 import os
+import ctypes
+import re
 #from tkinter import Tk, Button, Label, Entry, filedialog, Frame, Scrollbar, Canvas, messagebox, Toplevel, StringVar
 #from tkinter.ttk import Combobox
 from tkinter import Tk, Toplevel
@@ -15,7 +17,7 @@ class PDFMergerUI:
     def __init__(self, root):
         self.root = root
         self.root.title("📄 PDF 合併工具")
-        self.root.geometry("750x500")
+        self.root.geometry("950x600")
         self.root.configure(bg="#f5f5f7") # 現代感的淺灰色背景
 
         # 設定ttk樣式區塊
@@ -129,15 +131,19 @@ class PDFMergerUI:
                 
         elif template == "第○-○頁":
             if new_text.startswith("第") and new_text.endswith("頁"):
-                pages_part = new_text[1:-1]
-                return all(c.isdigit() or c == "-" for c in pages_part)
+                middle_part = new_text[1:-1]
+                return middle_part.count("-") < 2 and all((c.isdigit() or c=="○" or c=="") for c in middle_part.split("-"))
         
-        return false
+        return False
 
     def add_pdf(self):
         file_paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
         for file_path in file_paths:
             if file_path:
+                # 2.0 讀取pdf檔案資訊
+                reader = PdfReader(file_path)
+                pages_count = len(reader.pages)
+                
                 # 2.1 建立個別檔案的Frame
                 file_frame = tk.Frame(self.scrollable_frame, bg="#ffffff", highlightthickness=1,
                                       highlightbackground="#e1e4e8", pady=10)
@@ -148,7 +154,7 @@ class PDFMergerUI:
                 menu_frame.pack(side="left", fill="both", expand="True", padx=15)
                 
                 # 建立檔名標籤 
-                file_label = tk.Label(menu_frame, text="📄 "+os.path.basename(file_path),
+                file_label = tk.Label(menu_frame, text="📄 "+os.path.basename(file_path)+" （共"+str(pages_count)+"頁）",
                          font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#0366d6")
                 #file_label.pack(anchor="w")
                 file_label.grid(row=0, column=0, pady=(0,15), sticky="w")
@@ -191,17 +197,43 @@ class PDFMergerUI:
                     preview_button.image = preview_image  # 防止圖片被垃圾回收
                     preview_button.pack(side="bottom")
 
-                self.pdf_files.append((file_path, page_entry, file_frame))
+                self.pdf_files.append((file_path, page_entry, file_frame, reader))
 
     def set_customized_page(self, range_text):
-        for _, entry, _ in self.pdf_files:
+        for _, entry, _,reader in self.pdf_files:
+            #將輸入範圍轉換成指定格式
+            pages_count = len(reader.pages)
+            new_text = self.match_range(range_text, pages_count)
             entry.delete(0, "end")
-            entry.insert(0, range_text)
+            entry.insert(0, new_text)
 
     def set_all_to_all_pages(self):
-        for _, entry, _ in self.pdf_files:
+        for _, entry, _,_ in self.pdf_files:
             entry.delete(0, "end")
             entry.insert(0, "全部")
+            
+    def match_range(self, range_text, pages_count):
+        #將輸入範圍轉換成指定格式
+        pattern = r'(全部|[0-9-]+)'
+        matches = re.findall(pattern, range_text)#設定匹配的正則表達式
+        pages_locator = ''.join(matches)
+
+        if range_text.startswith("前") and range_text.endswith("頁"):
+            return "1" if pages_count==1 else "1-"+str(min(int(pages_locator), pages_count))
+        elif range_text.startswith("後") and range_text.endswith("頁"):
+            return "1-"+str(pages_count-int(pages_locator)+1) if int(pages_locator) < (pages_count-1) else "1"
+        elif range_text.startswith("第") and range_text.endswith("頁"):
+            if "-" in range_text:
+                pages = [max(1,str(item)) for item in page_locator.split("-")].sort()
+                return "-".join(pages) if pages[0]!=pages[1] else str(pages[0])
+            else:
+                return str(max(1,min(int(pages_locator), page_count)))
+        elif range_text == "最後一頁":
+            return str(pages_count)
+        elif range_text == "全部":
+            return "全部"
+        else:
+            return "全部"
 
     def move_pdf(self, file_frame, direction):
         # 找出被點擊的檔案在 list 中的索引
@@ -217,11 +249,11 @@ class PDFMergerUI:
 
     def update_ui(self):
         # 清除舊 UI
-        for _, _, frame in self.pdf_files:
+        for _, _, frame, _ in self.pdf_files:
             frame.pack_forget()
 
         # 依照順序重新排版
-        for _, _, frame in self.pdf_files:
+        for _, _, frame, _ in self.pdf_files:
             frame.pack(fill="x", padx=10, pady=5)
 
 
@@ -296,7 +328,7 @@ class PDFMergerUI:
     def merge_pdfs(self):
         writer = PdfWriter()
         try:
-            for pdf_path, entry, _ in self.pdf_files:
+            for pdf_path, entry, _, _ in self.pdf_files:
                 reader = PdfReader(pdf_path)
                 page_input = entry.get()
                 selected_pages = self.parse_pages(page_input, len(reader.pages))
@@ -314,6 +346,15 @@ class PDFMergerUI:
             messagebox.showinfo("完成", f"✅ 已成功合併 PDF！\n儲存於：\n{output_path}")
 
 if __name__ == "__main__":
+
+    # 解決低解析度問題
+    # 1. 找到 Windows 負責控制「縮放意識 (DPI Awareness)」的 DLL 檔案
+    # 2. 呼叫 SetProcessDpiAwareness 這個 C 語言函式
+    # 參數 1 代表「支援系統縮放，但不模糊」
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
     root = Tk()
     app = PDFMergerUI(root)
     root.mainloop()
