@@ -1,6 +1,7 @@
 import os
 import ctypes
 import re
+import sys
 #from tkinter import Tk, Button, Label, Entry, filedialog, Frame, Scrollbar, Canvas, messagebox, Toplevel, StringVar
 #from tkinter.ttk import Combobox
 from tkinter import Tk, Toplevel
@@ -11,7 +12,12 @@ from PyPDF2 import PdfReader, PdfWriter
 from PIL import Image, ImageTk  # 用來顯示縮圖
 from pdf2image import convert_from_path
 
-POPPLER_PATH = r".\poppler-24.08.0\Library\bin" 
+#例外處理
+import _tkinter
+from PyPDF2.errors import PdfReadError
+
+
+#POPPLER_PATH = r".\poppler-24.08.0\Library\bin"
 
 class PDFMergerUI:
     def __init__(self, root):
@@ -69,23 +75,23 @@ class PDFMergerUI:
         self.control_frame.pack()
 
             # 下拉選單與一鍵設定
-        self.combobox = ttk.Combobox(self.control_frame, values=["第○頁", "第○-○頁", "前○頁", "後○頁", "最後一頁"], state="readonly", width=12)
-        self.combobox.set("第○頁")
+        self.combobox = ttk.Combobox(self.control_frame, values=["請選擇","第○頁", "第○-○頁", "前○頁", "後○頁", "最後一頁"], state="readonly", width=12)
+        self.combobox.set("請選擇")
         self.combobox.grid(row=0, column=0, padx=5, ipady=3)
 
         vcmd = (self.root.register(self.validate_entry), '%P', '%s') #註冊驗證函式
-        self.entry_var = tk.StringVar(value="第○頁")
-        self.customize_entry = ttk.Entry(
+        self.entry_var = tk.StringVar(value="")
+        self.customized_entry = ttk.Entry(
             self.control_frame,
             textvariable=self.entry_var,
             width=15,
             validate="key", #在按鍵輸入時觸發驗證
             validatecommand=vcmd #綁定驗證函式
         )
-        self.customize_entry.grid(row=0, column=1, padx=5, ipady=3)
+        self.customized_entry.grid(row=0, column=1, padx=5, ipady=3)
 
         # 綁定下拉選單與輸入欄位
-        self.combobox.bind("<<ComboboxSelected>>",lambda event: self.entry_var.set(self.combobox.get()))
+        self.combobox.bind("<<ComboboxSelected>>", self.on_template_change)
         
         self.set_button = ttk.Button(self.control_frame, text="📚 一鍵設定",
                                      command=lambda: self.set_customized_page(self.entry_var.get())
@@ -111,10 +117,12 @@ class PDFMergerUI:
         # 取得目前下拉選單選中的樣板類型
         template = self.combobox.get()
 
-        if template == "最後一頁":
+        if template == "請選擇":
+            return "---"
+        elif template == "最後一頁":
             return new_text == "最後一頁"
 
-        if template == "第○頁":
+        elif template == "第○頁":
             if new_text.startswith("第") and new_text.endswith("頁"):
                 middle_part = new_text[1:-1]
                 return middle_part == "" or middle_part.isdigit()
@@ -136,12 +144,31 @@ class PDFMergerUI:
         
         return False
 
+    def on_template_change(self, event):
+        selected = self.combobox.get()
+
+        if selected == "請選擇":
+            self.customized_entry.config(state="readonly")
+            self.entry_var.set("")
+        elif selected=="最後一頁":
+            self.customized_entry.config(state="readonly")
+            self.entry_var.set("最後一頁")
+        else:
+            self.customized_entry.config(state="normal")
+            self.entry_var.set(selected)
+
     def add_pdf(self):
         file_paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
         for file_path in file_paths:
             if file_path:
+                
                 # 2.0 讀取pdf檔案資訊
-                reader = PdfReader(file_path)
+                try:
+                    reader = PdfReader(file_path)
+                except Exception as e:
+                    messagebox.showerror("讀取失敗", f"檔案無法解析：{os.path.basename(file_path)}\n\n可能是檔案毀損或加密格式不支援。\n錯誤原因：{e}")
+                    continue
+                    
                 pages_count = len(reader.pages)
                 
                 # 2.1 建立個別檔案的Frame
@@ -199,13 +226,29 @@ class PDFMergerUI:
 
                 self.pdf_files.append((file_path, page_entry, file_frame, reader))
 
+
     def set_customized_page(self, range_text):
-        for _, entry, _,reader in self.pdf_files:
-            #將輸入範圍轉換成指定格式
-            pages_count = len(reader.pages)
-            new_text = self.match_range(range_text, pages_count)
-            entry.delete(0, "end")
-            entry.insert(0, new_text)
+        if range_text=="":
+            return
+        
+        try:
+            warning = False
+            for _, entry, _,reader in self.pdf_files:
+                #將輸入範圍轉換成指定格式
+                pages_count = len(reader.pages)
+                new_text = self.match_range(range_text, pages_count)
+                entry.delete(0, "end")
+                if new_text != "":
+                    entry.insert(0, new_text)
+                else:
+                    warning = True
+            if warning:
+                messagebox.showwarning("提示", "提示：檢測到超出範圍的設定，系統將自動忽略。\n")
+        except ValueError as e:
+            messagebox.showerror("設定失敗", f"輸入含有不合法字元：\n可能是頁數未設定或頁數為空值。\n\n錯誤原因：{e}")
+        except Exception as e:
+            messagebox.showerror("設定失敗", f"出現非預期錯誤\n\n錯誤原因:{e}")
+   
 
     def set_all_to_all_pages(self):
         for _, entry, _,_ in self.pdf_files:
@@ -213,28 +256,72 @@ class PDFMergerUI:
             entry.insert(0, "全部")
             
     def match_range(self, range_text, pages_count):
-        #將輸入範圍轉換成指定格式
-        pattern = r'(全部|[0-9-]+)'
-        matches = re.findall(pattern, range_text)#設定匹配的正則表達式
-        pages_locator = ''.join(matches)
+        try:
+            #將輸入範圍轉換成指定格式
+            pattern = r'(全部|[0-9-]+)'
+            matches = re.findall(pattern, range_text)#設定匹配的正則表達式
+            pages_locator = ''.join(matches)
 
-        if range_text.startswith("前") and range_text.endswith("頁"):
-            return "1" if pages_count==1 else "1-"+str(min(int(pages_locator), pages_count))
-        elif range_text.startswith("後") and range_text.endswith("頁"):
-            return "1-"+str(pages_count-int(pages_locator)+1) if int(pages_locator) < (pages_count-1) else "1"
-        elif range_text.startswith("第") and range_text.endswith("頁"):
-            if "-" in range_text:
-                pages = [max(1,str(item)) for item in page_locator.split("-")].sort()
-                return "-".join(pages) if pages[0]!=pages[1] else str(pages[0])
+            if range_text.startswith("前") and range_text.endswith("頁"):
+
+                #計算結束頁，並使其不超過總頁數
+                end_page = min(int(pages_locator), pages_count)
+
+                if end_page > 1:
+                    return "1-"+str(end_page)
+                elif end_page == 1:
+                    return str(end_page)
+                else:
+                    return ""
+
+            elif range_text.startswith("後") and range_text.endswith("頁"):
+
+                #計算起始頁，並使其不低於1頁
+                start_page = max(1, pages_count-int(pages_locator)+1)
+
+                if start_page < pages_count:
+                    return str(start_page)+"-"+str(pages_count)
+                elif start_page == pages_count:
+                    return str(pages_count)
+                else:
+                    return ""
+
+            elif range_text.startswith("第") and range_text.endswith("頁"):
+                pages = [int(item) for item in pages_locator.split("-")]
+                
+                #設定多頁
+                if len(pages)==2:
+                    sorted_pages = sorted(pages)
+                    
+                    if max(pages)<1 or min(pages)>pages_count:
+                        return ""
+                    else:
+                        mod_pages = [str( min(pages_count, max(1, item)) ) for item in pages]
+                        return "-".join(mod_pages) if mod_pages[0]!=mod_pages[1] else mod_pages[0]
+                #設定單頁
+                elif len(pages)==1:
+                    return str(pages[0]) if (pages[0]>0 and pages[0]<=pages_count) else ""
+
+                #非預期設定
+                else:
+                    return ""
+
+            elif range_text == "最後一頁":
+                return str(pages_count)
+            
+            elif range_text == "全部":
+                return "全部"
+            
             else:
-                return str(max(1,min(int(pages_locator), page_count)))
-        elif range_text == "最後一頁":
-            return str(pages_count)
-        elif range_text == "全部":
-            return "全部"
-        else:
-            return "全部"
+                return "全部"
 
+        #使用者輸入非法範圍(如○,空值)時報錯。為使設定多個檔案時只報一次錯誤，raise exception到函式外層處理。
+        except ValueError as e:
+            raise ValueError(e)
+            print(e)
+        except Exception as e:
+            raise Exception(e)
+            
     def move_pdf(self, file_frame, direction):
         # 找出被點擊的檔案在 list 中的索引
         idx = next((i for i, item in enumerate(self.pdf_files) if item[2] == file_frame), None)
@@ -256,9 +343,18 @@ class PDFMergerUI:
         for _, _, frame, _ in self.pdf_files:
             frame.pack(fill="x", padx=10, pady=5)
 
+    def get_poppler_path(self):
+        base = getattr(sys, '_MEIPASS', None)
+
+        if base:  # exe 環境
+            return os.path.join(base, "poppler", "Library", "bin")
+        else:  # 開發環境
+            return os.path.join(os.path.dirname(__file__), "poppler-24.08.0", "Library", "bin")
+
 
     def generate_thumbnail(self, pdf_path):
         try:
+            POPPLER_PATH = self.get_poppler_path()
             images = convert_from_path(pdf_path, first_page=1, last_page=1, size=(100, 100), poppler_path=POPPLER_PATH)
             if images:
                 return images[0]
@@ -269,6 +365,7 @@ class PDFMergerUI:
     def preview_pdf(self, pdf_path):
         try:
             # 用高 DPI 轉圖片，但不指定尺寸，保留原始大小比例
+            POPPLER_PATH = self.get_poppler_path()
             images = convert_from_path(pdf_path, first_page=1, last_page=1, dpi=200, poppler_path=POPPLER_PATH)
             if not images:
                 messagebox.showwarning("預覽失敗", "無法產生預覽圖片。")
@@ -302,24 +399,30 @@ class PDFMergerUI:
             messagebox.showerror("預覽錯誤", f"無法顯示預覽：{e}")
         
     def parse_pages(self, input_str, max_page):
-        if not input_str.strip() or input_str.lower().startswith("全部"):
-            return list(range(max_page))  # 全部頁面（0-indexed）
-
-        pages = set()
+        input_str = input_str.strip()
+        pages = []
+        
         for part in input_str.split(","):
             part = part.strip()
             if "-" in part:
                 try:
                     start, end = map(int, part.split("-"))
-                    pages.update(range(start - 1, end))
+                    pages.extend(range(start-1, end)) if start<end else pages.extend(range(start-1, end-2, -1))
                 except ValueError:
+                    continue
+            elif "全部" in part:
+                try:
+                    pages.extend(range(max_page))
+                except Exception:
                     continue
             else:
                 try:
-                    pages.add(int(part) - 1)
+                    pages.append(int(part)-1)
                 except ValueError:
                     continue
-        return sorted(pages)
+        return pages
+            
+        
 
     def remove_pdf(self, file_frame):
         self.pdf_files = [item for item in self.pdf_files if item[2] != file_frame]
@@ -328,10 +431,10 @@ class PDFMergerUI:
     def merge_pdfs(self):
         writer = PdfWriter()
         try:
-            for pdf_path, entry, _, _ in self.pdf_files:
-                reader = PdfReader(pdf_path)
+            for pdf_path, entry, _, reader in self.pdf_files:
+                pages_count = len(reader.pages)
                 page_input = entry.get()
-                selected_pages = self.parse_pages(page_input, len(reader.pages))
+                selected_pages = self.parse_pages(page_input, pages_count)
                 for i in selected_pages:
                     if 0 <= i < len(reader.pages):
                         writer.add_page(reader.pages[i])
