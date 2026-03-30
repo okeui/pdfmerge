@@ -222,10 +222,7 @@ class PDFMergerUI:
             self.entry_var.set(selected)
 
     def add_pdf(self):
-        file_paths = filedialog.askopenfilenames(filetypes=[("所有支援檔案", "*.pdf *.docx *.png *.jpg *.jpeg"),
-                                                            ("PDF files", "*.pdf"),
-                                                            ("Word files", "*.docx"),
-                                                            ("圖片檔案", "*.png *.jpg *.jpeg")])
+        file_paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
         for file_path in file_paths:
             if file_path:
                 
