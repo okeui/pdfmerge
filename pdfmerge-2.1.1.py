@@ -73,12 +73,12 @@ class PDFMergerUI:
             #2.2 右側區塊: 進階設定側邊欄
 
         #self.sidebar_frame = tk.Frame(self.main_body, bg="#ffffff", width=280, padx=20, pady=10, highlightthickness=1, highlightbackground="#e1e4e8")
-        self.sidebar_frame = ctk.CTkFrame(self.main_body, corner_radius=15, fg_color="#ffffff", width=280, border_width=1, border_color="#e1e4e8")
+        self.sidebar_frame = ctk.CTkFrame(self.main_body, corner_radius=15, fg_color="#ffffff", width=320, border_width=1, border_color="#e1e4e8")
         self.sidebar_frame.pack_propagate(False) #禁止子元件影響容器大小
         self.sidebar_frame.pack(side="right", fill="y", padx=(15,0))
 
-        self.sidebar_label = tk.Label(self.sidebar_frame, text="快速設定", font=("Microsoft JhengHei", 13, "bold"), bg="#ffffff", fg="#333333")
-        self.sidebar_label.pack(pady=(10, 10))
+        self.sidebar_label = tk.Label(self.sidebar_frame, text="進階設定", font=("Microsoft JhengHei", 13, "bold"), bg="#ffffff", fg="#333333")
+        self.sidebar_label.pack(pady=(10,10))
 
             #2.2.1 檔案匯入區塊
         self.import_files_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
@@ -87,9 +87,61 @@ class PDFMergerUI:
         self.import_files_frame.columnconfigure(1, weight=1)  # 欄位平分
 
             # 設定頁面標題
-        self.import_label = tk.Label(self.import_files_frame, text="匯入設定", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
-        self.import_label.grid(row=0, column=0, columnspan=2, pady=(10, 5))
+        self.import_label = tk.Label(self.import_files_frame, text="批次匯入", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
+        self.import_label.grid(row=0, column=0, columnspan=2, pady=(10,5))
+
+        #self.set_path_label = tk.Label(self.import_files_frame, text="設定目標路徑", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
+        #self.set_path_label.grid(row=1, column=0, padx=4, pady=(0,4), sticky="e")
+
+            # 2.2.1.1 匯入路徑區塊
+        self.set_path_frame = ctk.CTkFrame(self.import_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
+        self.set_path_frame.grid(row=1, column=0, padx=4, pady=(0,4), sticky="e")
+
+        self.set_path_label = tk.Label(self.set_path_frame, text="1.匯入路徑設定", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
+        self.set_path_label.grid(row=0, column=0, columnspan=2, pady=(4,4))
         
+
+            # 輸入路徑欄位
+        self.target_folder_entry = ttk.Entry(self.set_path_frame, width=13)
+        #self.target_folder_entry.grid(row=1, column=2, sticky="w", padx=8, pady=(0,4), ipady=3)
+        self.target_folder_entry.grid(row=1, column=0, sticky="e", padx=(8,2), pady=(0,8), ipady=2)
+
+
+            # 選擇路徑按鈕
+        self.set_path_button = ttk.Button(self.set_path_frame, text="📂", width=2,
+                                     command=lambda: self.add_to_customized_page(self.entry_var.get()))
+        #self.set_path_button.grid(row=1, column=1, sticky="e", padx=8, pady=(0,4))
+        self.set_path_button.grid(row=1, column=1, padx=(2,8), pady=(0,8), sticky="w")
+        
+
+            # 2.2.1.2 關鍵字區塊
+        self.keyword_frame = ctk.CTkFrame(self.import_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
+        self.keyword_frame.grid(row=1, column=1, padx=4, pady=(0,4), sticky="w")
+
+        self.keyword_label = tk.Label(self.keyword_frame, text="2.關鍵字設定", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
+        self.keyword_label.grid(row=0, column=0, columnspan=2, pady=(4,4))
+        
+
+            # 輸入關鍵字欄位
+        self.keyword_entry = ttk.Entry(self.keyword_frame, width=13)
+        self.keyword_entry.grid(row=1, column=0, sticky="e", padx=(8,2), pady=(0,8), ipady=2)
+
+
+            # 選擇路徑按鈕
+        self.hint_button = ttk.Button(self.keyword_frame, text="？", width=2,
+                                     command=lambda: self.add_to_customized_page(self.entry_var.get()))
+        self.hint_button.grid(row=1, column=1, padx=(2,8), pady=(0,8), sticky="w")
+
+
+            # 2.2.1.3 一鍵匯入按鈕
+        self.import_files_button = ttk.Button(self.import_files_frame, text="✅ 一鍵匯入", width=16,
+                                     command=lambda: self.add_to_customized_page(self.entry_var.get()))
+        self.import_files_button.grid(row=2, column=0, padx=(0,5), pady=(2,10), sticky='e')
+
+        self.delete_files_button = ttk.Button(self.import_files_frame, text="❎ 一鍵清除", width=16,
+                                     command=lambda: self.add_to_customized_page(self.entry_var.get()))
+        self.delete_files_button.grid(row=2, column=1, padx=(5,0), pady=(2,10), sticky='w')
+            
         
             #2.2.2 頁面設定區塊
         self.set_page_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
@@ -102,12 +154,14 @@ class PDFMergerUI:
         
             # 設定頁面標題
         self.page_label = tk.Label(self.set_page_frame, text="頁面設定", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
-        self.page_label.grid(row=0, column=0, columnspan=2, pady=(10, 5))
-
-        self.combobox = ttk.Combobox(self.set_page_frame, values=["請選擇","第○頁", "第○-○頁", "前○頁", "後○頁", "最後一頁"], state="readonly", width=11)
+        self.page_label.grid(row=0, column=0, columnspan=2, pady=(10,4))
+        
+            # 設定下拉選單
+        self.combobox = ttk.Combobox(self.set_page_frame, values=["請選擇","全部", "第○頁", "第○-○頁", "前○頁", "後○頁", "最後一頁"], state="readonly", width=11)
         self.combobox.set("請選擇")
-        self.combobox.grid(row=1, column=0, padx=8, ipady=3, sticky="e")
+        self.combobox.grid(row=1, column=0, padx=8, pady=(0,4), ipady=3, sticky="e")
 
+            # 設定輸入欄位
         vcmd = (self.root.register(self.validate_entry), '%P', '%s') #註冊驗證函式
         self.entry_var = tk.StringVar(value="")
         self.customized_entry = ttk.Entry(
@@ -117,25 +171,25 @@ class PDFMergerUI:
             validate="key", #在按鍵輸入時觸發驗證
             validatecommand=vcmd #綁定驗證函式
         )
-        self.customized_entry.grid(row=1, column=1, padx=8, ipady=3, sticky="w")
+        self.customized_entry.grid(row=1, column=1, padx=8, pady=(0,4) , ipady=3, sticky="w")
 
-        # 綁定下拉選單與輸入欄位
+            # 綁定下拉選單與輸入欄位
         self.combobox.bind("<<ComboboxSelected>>", self.on_template_change)
         
-        #插入橫線
-        tk.Frame(self.set_page_frame, bg="#e1e4e8", height=3).grid(row=2, column=0, columnspan=2, padx=5, pady=2)
+            # 插入橫線
+        #tk.Frame(self.set_page_frame, bg="#e1e4e8", height=3).grid(row=2, column=0, columnspan=2, padx=5, pady=2)
 
+            # 一鍵設定按鈕
+        self.set_all_button = ttk.Button(self.set_page_frame, text="📚 一鍵套用",
+                                     command=lambda: self.set_customized_page(self.entry_var.get()) if self.entry_var.get()!="全部" else self.set_all_to_all_pages()
+                                     )
+        self.set_all_button.grid(row=3, column=0, padx=8, pady=(4,10), sticky="e")
 
+            # 一鍵新增按鈕
         self.add_page_button = ttk.Button(self.set_page_frame, text="📚 一鍵新增",
                                      command=lambda: self.add_to_customized_page(self.entry_var.get())
                                      )
-        self.add_page_button.grid(row=3, column=0, padx=8, pady=(5, 10), sticky="e")
-
-        self.set_button = ttk.Button(self.set_page_frame, text="📚 一鍵設定",
-                                     command=lambda: self.set_customized_page(self.entry_var.get())
-                                     )
-        self.set_button.grid(row=3, column=1, padx=8, pady=(5, 10), sticky="w")
-
+        self.add_page_button.grid(row=3, column=1, padx=8, pady=(4,10), sticky="w")
 
 
             #2.2.3 分割設定區塊
@@ -168,10 +222,13 @@ class PDFMergerUI:
         self.set_all_button = ttk.Button(self.control_frame, text="📚 一鍵設為全部", width=15, command=self.set_all_to_all_pages)
         self.set_all_button.grid(row=0, column=1, padx=5)
 
-
             # 合併PDF按鈕
         self.merge_button = ttk.Button(self.control_frame, text="🔄 開始合併", width=12,
                                        command=self.merge_pdfs).grid(row=0, column=2, padx=5)
+
+            # 分割PDF按鈕
+        self.split_button = ttk.Button(self.control_frame, text="🔄 開始分割", width=12,
+                                       command=self.split_pdfs).grid(row=0, column=3, padx=5)
 
     def validate_entry(self, new_text, old_text):
         """
@@ -183,6 +240,10 @@ class PDFMergerUI:
 
         if template == "請選擇":
             return "---"
+
+        elif template == "全部":
+            return new_text == "全部"
+        
         elif template == "最後一頁":
             return new_text == "最後一頁"
 
@@ -561,6 +622,9 @@ class PDFMergerUI:
             with open(output_path, "wb") as out_file:
                 writer.write(out_file)
             messagebox.showinfo("完成", f"✅ 已成功合併 PDF！\n儲存於：\n{output_path}")
+
+    def split_pdfs(self):
+        pass
 
 if __name__ == "__main__":
 
