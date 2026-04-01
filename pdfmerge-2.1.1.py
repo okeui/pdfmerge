@@ -1,10 +1,8 @@
-import os
-import ctypes
-import re
-import sys
+import os, ctypes, re, sys
+from pathlib import Path
 #from tkinter import Tk, Button, Label, Entry, filedialog, Frame, Scrollbar, Canvas, messagebox, Toplevel, StringVar
 #from tkinter.ttk import Combobox
-from tkinter import Tk, Toplevel
+from tkinter import Tk, Toplevel, scrolledtext
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, Canvas
@@ -23,7 +21,7 @@ class PDFMergerUI:
     def __init__(self, root):
         self.root = root
         self.root.title("📄 PDF 合併工具")
-        self.root.geometry("950x600")
+        self.root.geometry("900x650")
         self.root.configure(bg="#f5f5f7") # 現代感的淺灰色背景
 
         # 設定ttk樣式區塊
@@ -95,35 +93,35 @@ class PDFMergerUI:
 
             # 2.2.1.1 匯入路徑區塊
         self.set_path_frame = ctk.CTkFrame(self.import_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
-        self.set_path_frame.grid(row=1, column=0, padx=4, pady=(0,4), sticky="e")
+        self.set_path_frame.grid(row=1, column=0, columnspan=2, padx=4, pady=(0,4))
 
         self.set_path_label = tk.Label(self.set_path_frame, text="1.匯入路徑設定", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
         self.set_path_label.grid(row=0, column=0, columnspan=2, pady=(4,4))
         
 
             # 輸入路徑欄位
-        self.target_folder_entry = ttk.Entry(self.set_path_frame, width=13)
+        self.path_entry = ttk.Entry(self.set_path_frame, width=30)
         #self.target_folder_entry.grid(row=1, column=2, sticky="w", padx=8, pady=(0,4), ipady=3)
-        self.target_folder_entry.grid(row=1, column=0, sticky="e", padx=(8,2), pady=(0,8), ipady=2)
+        self.path_entry.grid(row=1, column=0, sticky="e", padx=(8,2), pady=(0,8), ipady=2)
 
 
             # 選擇路徑按鈕
-        self.set_path_button = ttk.Button(self.set_path_frame, text="📂", width=2,
-                                     command=lambda: self.add_to_customized_page(self.entry_var.get()))
+        self.path_button = ttk.Button(self.set_path_frame, text="📂", width=2,
+                                     command=lambda: self.set_path_entry())
         #self.set_path_button.grid(row=1, column=1, sticky="e", padx=8, pady=(0,4))
-        self.set_path_button.grid(row=1, column=1, padx=(2,8), pady=(0,8), sticky="w")
+        self.path_button.grid(row=1, column=1, padx=(2,8), pady=(0,8), sticky="w")
         
 
             # 2.2.1.2 關鍵字區塊
         self.keyword_frame = ctk.CTkFrame(self.import_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
-        self.keyword_frame.grid(row=1, column=1, padx=4, pady=(0,4), sticky="w")
+        self.keyword_frame.grid(row=2, column=0, columnspan=2, padx=4, pady=(0,4))
 
         self.keyword_label = tk.Label(self.keyword_frame, text="2.關鍵字設定", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
         self.keyword_label.grid(row=0, column=0, columnspan=2, pady=(4,4))
         
 
             # 輸入關鍵字欄位
-        self.keyword_entry = ttk.Entry(self.keyword_frame, width=13)
+        self.keyword_entry = ttk.Entry(self.keyword_frame, width=30)
         self.keyword_entry.grid(row=1, column=0, sticky="e", padx=(8,2), pady=(0,8), ipady=2)
 
 
@@ -134,13 +132,13 @@ class PDFMergerUI:
 
 
             # 2.2.1.3 一鍵匯入按鈕
-        self.import_files_button = ttk.Button(self.import_files_frame, text="✅ 一鍵匯入", width=16,
-                                     command=lambda: self.add_to_customized_page(self.entry_var.get()))
-        self.import_files_button.grid(row=2, column=0, padx=(0,5), pady=(2,10), sticky='e')
+        self.import_files_button = ttk.Button(self.import_files_frame, text="✅ 批次匯入", width=16,
+                                     command=lambda: self.batch_add_pdfs())
+        self.import_files_button.grid(row=3, column=0, padx=(0,5), pady=(2,10), sticky='e')
 
-        self.delete_files_button = ttk.Button(self.import_files_frame, text="❎ 一鍵清除", width=16,
+        self.delete_files_button = ttk.Button(self.import_files_frame, text="❎ 清除全部", width=16,
                                      command=lambda: self.add_to_customized_page(self.entry_var.get()))
-        self.delete_files_button.grid(row=2, column=1, padx=(5,0), pady=(2,10), sticky='w')
+        self.delete_files_button.grid(row=3, column=1, padx=(5,0), pady=(2,10), sticky='w')
             
         
             #2.2.2 頁面設定區塊
@@ -216,7 +214,7 @@ class PDFMergerUI:
 
             # 新增pdf按鈕
         self.add_button = ttk.Button(self.control_frame, text="➕ 新增 PDF",width=12,
-                                        command=self.add_pdf).grid(row=0, column=0, padx=5)
+                                        command=self.manual_add_pdfs).grid(row=0, column=0, padx=5)
             
             # 設為全部頁面的按鈕
         self.set_all_button = ttk.Button(self.control_frame, text="📚 一鍵設為全部", width=15, command=self.set_all_to_all_pages)
@@ -230,60 +228,36 @@ class PDFMergerUI:
         self.split_button = ttk.Button(self.control_frame, text="🔄 開始分割", width=12,
                                        command=self.split_pdfs).grid(row=0, column=3, padx=5)
 
-    def validate_entry(self, new_text, old_text):
-        """
-            new_text(%P):變動後的字串
-            old_text(%s):變動前的字串
-        """
-        # 取得目前下拉選單選中的樣板類型
-        template = self.combobox.get()
-
-        if template == "請選擇":
-            return "---"
-
-        elif template == "全部":
-            return new_text == "全部"
-        
-        elif template == "最後一頁":
-            return new_text == "最後一頁"
-
-        elif template == "第○頁":
-            if new_text.startswith("第") and new_text.endswith("頁"):
-                middle_part = new_text[1:-1]
-                return middle_part == "" or middle_part.isdigit()
-
-        elif template == "前○頁":
-            if new_text.startswith("前") and new_text.endswith("頁"):
-                middle_part = new_text[1:-1]
-                return middle_part == "" or middle_part.isdigit()
-
-        elif template == "後○頁":
-            if new_text.startswith("後") and new_text.endswith("頁"):
-                middle_part = new_text[1:-1]
-                return middle_part == "" or middle_part.isdigit()
-                
-        elif template == "第○-○頁":
-            if new_text.startswith("第") and new_text.endswith("頁"):
-                middle_part = new_text[1:-1]
-                return middle_part.count("-") < 2 and all((c.isdigit() or c=="○" or c=="") for c in middle_part.split("-"))
-        
-        return False
-
-    def on_template_change(self, event):
-        selected = self.combobox.get()
-
-        if selected == "請選擇":
-            self.customized_entry.config(state="readonly")
-            self.entry_var.set("")
-        elif selected=="最後一頁":
-            self.customized_entry.config(state="readonly")
-            self.entry_var.set("最後一頁")
-        else:
-            self.customized_entry.config(state="normal")
-            self.entry_var.set(selected)
-
-    def add_pdf(self):
+    def manual_add_pdfs(self):
         file_paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
+        self.add_pdfs(file_paths)
+    
+    def batch_add_pdfs(self):
+        base_path = Path(self.path_entry.get())
+
+        #先判斷路徑是否存在
+        if not base_path.exists():
+            message.showerror("匯入失敗", f"路徑{folder_path}不存在。")
+            return
+
+        file_paths = []
+        keywords = re.split(r'[ ,]+', self.keyword_entry.get())
+
+        #遞迴搜尋所有子資料夾與檔案
+        for p in base_path.rglob("*"):
+            if p.is_file() and p.suffix.lower() == ".pdf":
+                path_str = str(p)
+
+                if all(key in path_str for key in keywords):
+                        file_paths.append(path_str)
+        if file_paths:
+            self.ask_scrollable_yesno("匯入確認","將批次匯入以下檔案:","\n".join(file_paths))
+            self.add_pdfs(file_paths)
+        else:
+            messagebox.showwarning("匯入失敗", f"沒有符合匯入條件的檔案")
+        
+
+    def add_pdfs(self, file_paths):
         for file_path in file_paths:
             if file_path:
                 
@@ -350,6 +324,12 @@ class PDFMergerUI:
 
                 self.pdf_files.append((file_path, page_entry, file_frame, reader))
 
+    def set_path_entry(self):
+        folder_path = filedialog.askdirectory(title="請選擇一個資料夾")
+        self.path_entry.delete(0, "end")
+        self.path_entry.insert(0, folder_path)
+        
+
 
     def set_customized_page(self, range_text):
         if range_text=="":
@@ -385,6 +365,59 @@ class PDFMergerUI:
         if value_error or other_error:
             messagebox.showerror("提示", message)
 
+    def validate_entry(self, new_text, old_text):
+        """
+            new_text(%P):變動後的字串
+            old_text(%s):變動前的字串
+        """
+        # 取得目前下拉選單選中的樣板類型
+        template = self.combobox.get()
+
+        if template == "請選擇":
+            return "---"
+
+        elif template == "全部":
+            return new_text == "全部"
+        
+        elif template == "最後一頁":
+            return new_text == "最後一頁"
+
+        elif template == "第○頁":
+            if new_text.startswith("第") and new_text.endswith("頁"):
+                middle_part = new_text[1:-1]
+                return middle_part == "" or middle_part.isdigit()
+
+        elif template == "前○頁":
+            if new_text.startswith("前") and new_text.endswith("頁"):
+                middle_part = new_text[1:-1]
+                return middle_part == "" or middle_part.isdigit()
+
+        elif template == "後○頁":
+            if new_text.startswith("後") and new_text.endswith("頁"):
+                middle_part = new_text[1:-1]
+                return middle_part == "" or middle_part.isdigit()
+                
+        elif template == "第○-○頁":
+            if new_text.startswith("第") and new_text.endswith("頁"):
+                middle_part = new_text[1:-1]
+                return middle_part.count("-") < 2 and all((c.isdigit() or c=="○" or c=="") for c in middle_part.split("-"))
+        
+        return False
+
+    def on_template_change(self, event):
+        selected = self.combobox.get()
+
+        if selected == "請選擇":
+            self.customized_entry.config(state="readonly")
+            self.entry_var.set("")
+        elif selected=="最後一頁":
+            self.customized_entry.config(state="readonly")
+            self.entry_var.set("最後一頁")
+        else:
+            self.customized_entry.config(state="normal")
+            self.entry_var.set(selected)
+    
+
     def add_to_customized_page(self, range_text):
         if range_text=="":
             return
@@ -396,16 +429,26 @@ class PDFMergerUI:
         message2 = "出現非預期錯誤\n\n錯誤原因:\n"
         for _, entry, _,reader in self.pdf_files:
             try:
-                #將輸入範圍轉換成指定格式
                 pages_count = len(reader.pages)
-                old_text = self.match_range(entry.get().strip(), pages_count)
-                new_text = self.match_range(range_text, pages_count)
+
+                #將原輸入範圍轉換成指定格式
+                original_text = entry.get()
+                original_ranges = [self.match_range(item.strip(), pages_count) for item in original_text.split(",")]
+                original_ranges = [item for item in original_ranges if item.strip()]
+                matched_original_text = ",".join(original_ranges)
+
+                #將新輸入範圍轉換成指定格式
+                matched_new_text = self.match_range(range_text, pages_count)
+
                 entry.delete(0, "end")
-                if old_text and entry.get()!=self.default_range_text:
-                    entry.insert(0, old_text+","+new_text)
-                else:
-                    if new_text != "":
-                        entry.insert(0, new_text)
+                
+                #若轉換格式後的原輸入範圍不為空，且原輸入範圍不為提示
+                if matched_original_text and original_text!=self.default_range_text:
+                    entry.insert(0, matched_original_text+","+matched_new_text)
+
+                #若轉換格式後的原輸入範圍為空，且新輸入範圍不為空
+                elif matched_new_text != "":
+                    entry.insert(0, matched_new_text)
                     
             except ValueError as e:
                 value_error = True
@@ -422,13 +465,13 @@ class PDFMergerUI:
 
         if value_error or other_error:
             messagebox.showerror("提示", message)
-   
+
 
     def set_all_to_all_pages(self):
         for _, entry, _,_ in self.pdf_files:
             entry.delete(0, "end")
             entry.insert(0, "全部")
-            
+
     def match_range(self, range_text, pages_count):
         try:
             #將輸入範圍轉換成指定格式
@@ -486,8 +529,10 @@ class PDFMergerUI:
             elif range_text == "全部":
                 return "全部"
             
+            elif re.fullmatch(r"^\d+-\d+$",range_text.strip()) or re.fullmatch(r"^\d+",range_text.strip()):
+                return range_text.strip()
             else:
-                return "全部"
+                return ""
 
         #使用者輸入非法範圍(如○,空值)時報錯。為使設定多個檔案時只報一次錯誤，raise exception到函式外層處理。
         except ValueError as e:
@@ -625,6 +670,58 @@ class PDFMergerUI:
 
     def split_pdfs(self):
         pass
+
+    def ask_scrollable_yesno(self, title, header, message):
+        """
+        建立一個帶有捲軸的『是/否』選擇視窗
+        回傳值: True (使用者點擊『是』), False (點擊『否』或直接關閉)
+        """
+        # 建立一個變數來儲存使用者的選擇
+        self._choice_result = False 
+
+        # 建立子視窗
+        msg_win = tk.Toplevel(self.root)
+        msg_win.title(title)
+        msg_win.geometry("700x450")
+    
+        # 設定為模態視窗 (強制聚焦)
+        msg_win.grab_set()
+
+        # 1. 標題與說明
+        tk.Label(msg_win, text=header, font=("Microsoft JhengHei", 11, "bold"), 
+             pady=10, fg="#333333").pack()
+
+        # 2. 帶捲軸的內容區域
+        text_area = scrolledtext.ScrolledText(msg_win, wrap=tk.WORD, width=60, height=15)
+        text_area.insert(tk.INSERT, message)
+        text_area.config(state='disabled') # 設為唯讀
+        text_area.pack(padx=20, pady=10, fill="both", expand=True)
+
+        # 3. 按鈕區 (水平排列)
+        btn_frame = tk.Frame(msg_win, pady=15)
+        btn_frame.pack(fill="x")
+
+        def on_yes():
+            self._choice_result = True
+            msg_win.destroy()
+
+        def on_no():
+            self._choice_result = False
+            msg_win.destroy()
+
+        # 是 (Yes) 按鈕
+        yes_btn = ttk.Button(btn_frame, text="是 (Yes)", width=12, command=on_yes)
+        yes_btn.pack(side="left", expand=True, padx=(50, 5))
+
+        # 否 (No) 按鈕
+        no_btn = ttk.Button(btn_frame, text="否 (No)", width=12, command=on_no)
+        no_btn.pack(side="left", expand=True, padx=(5, 50))
+
+        # --- 關鍵步驟：等待視窗關閉 ---
+        self.root.wait_window(msg_win)
+    
+        return self._choice_result
+    
 
 if __name__ == "__main__":
 
