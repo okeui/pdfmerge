@@ -21,7 +21,7 @@ class PDFMergerUI:
     def __init__(self, root):
         self.root = root
         self.root.title("📄 PDF 合併工具")
-        self.root.geometry("900x650")
+        self.root.geometry("1100x750")
         self.root.configure(bg="#f5f5f7") # 現代感的淺灰色背景
 
         # 設定ttk樣式區塊
@@ -817,7 +817,7 @@ class PDFMergerUI:
                 page_input = entry.get()
                 selected_pages = self.parse_pages(page_input, pages_count)
                 for i in selected_pages:
-                    if 0 <= i < len(reader.pages):
+                    if 0 <= i < pages_count:
                         writer.add_page(reader.pages[i])
         except Exception as e:
             messagebox.showerror("錯誤", f"合併時發生錯誤：{e}")
@@ -830,7 +830,30 @@ class PDFMergerUI:
             messagebox.showinfo("完成", f"✅ 已成功合併 PDF！\n儲存於：\n{output_path}")
 
     def split_pdfs(self):
-        pass
+        try:
+            writers = []
+            source_folders = []
+            for pdf_path, entry, _, reader in self.pdf_files:
+                need_split = False
+
+                writer = PdfWriter()
+                pages_count = len(reader.pages)
+                pages_input= entry.get()
+                selected_page = self.parse_pages(page_input, pages_count)
+                for i in selected_pages:
+                    if 0 <= i < pages_count:
+                        writer.add_page(reader.pages[i])
+                        need_split = True
+
+                #只匯出要分割的檔案
+                if need_split:
+                    writers.append(writer)
+                    source_folders.append(Path(pdf_path).parent) #紀錄來原檔案所屬資料夾
+            #依設定輸出
+            if var
+        except Exception as e:
+            messagebox.showerror("錯誤", f"分割時發生錯誤：{e}")
+            return
 
     def ask_scrollable_yesno(self, title, header, message):
         """
