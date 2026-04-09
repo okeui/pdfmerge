@@ -830,30 +830,85 @@ class PDFMergerUI:
             messagebox.showinfo("完成", f"✅ 已成功合併 PDF！\n儲存於：\n{output_path}")
 
     def split_pdfs(self):
+        def get_unique_output_path(original_path, suffix="_split"):
+            """
+            original_path: 原檔案路徑 (str 或 Path)
+            suffix: 想要加在原檔名後的字串
+            """
+            p = Path(original_path)
+            # 組合初始的輸出路徑：原資料夾 / (原檔名 + 字尾 + .pdf)
+            folder = p.parent
+            base_name = p.stem  # 取得不含副檔名的檔名
+            ext = p.suffix     # 取得副檔名 (.pdf)
+    
+            # 初始目標路徑
+            target_path = folder / f"{base_name}{suffix}{ext}"
+    
+            counter = 1
+            # 如果檔案已經存在，就進入迴圈尋找下一個可用的序號
+            while target_path.exists():
+                target_path = folder / f"{base_name}{suffix}({counter}){ext}"
+                counter += 1
+        
+            return target_path
+        
         try:
             writers = []
-            source_folders = []
+            source_paths = []
             for pdf_path, entry, _, reader in self.pdf_files:
                 need_split = False
 
                 writer = PdfWriter()
                 pages_count = len(reader.pages)
                 pages_input= entry.get()
-                selected_page = self.parse_pages(page_input, pages_count)
+                selected_pages = self.parse_pages(pages_input, pages_count)
                 for i in selected_pages:
                     if 0 <= i < pages_count:
                         writer.add_page(reader.pages[i])
                         need_split = True
 
-                #只匯出要分割的檔案
+                # 只匯出要分割的檔案
                 if need_split:
                     writers.append(writer)
-                    source_folders.append(Path(pdf_path).parent) #紀錄來原檔案所屬資料夾
-            #依設定輸出
-            if var
+                    source_paths.append(Path(pdf_path))
+
+            # 依匯出設定輸出
+            # 由使用者選擇匯出路徑
+            output_paths = []
+            if self.split_path_option.get()=="A":
+                output_paths.extend( [ Path(filedialog.askdirectory(title="請選擇匯出路徑")) ] * len(writers) )
+            # 匯出至原檔案資料夾    
+            elif self.split_path_option.get()=="B":
+                output_paths = [ path.parent for path in source_paths] # 取得來原檔案所屬資料夾
+
+            # 匯出至使用者自訂路徑
+            else:
+                if Path(self.custom_split_path.get()).exists():
+                    output_paths.extend( [self.custom_split_path.get()] * len(writers) )
+                else:
+                    messagebox.showerror("匯出錯誤", "自訂的路徑不存在。\n")
         except Exception as e:
             messagebox.showerror("錯誤", f"分割時發生錯誤：{e}")
             return
+
+            # 依序匯出檔案
+        messages = []
+        for writer, output_path, source_path in zip(writers, output_paths, source_paths):
+            try:
+                if output_path:
+                    #決定輸出的檔名
+                    file_path = get_unique_output_path(str(output_path)+"/"+str(source_path.name))
+
+                    with open(file_path, "wb") as out_file:
+                        writer.write(out_file)
+                        messages.append(f"【成功】分割{source_path}，儲存於：{output_path}")
+            except Exception as e:
+                messages.append(f"【失敗】分割{source_path}")
+
+        self.show_scrollable_info("完成PDF分割", "分割結果:", "\n".join(messages))
+        return
+                    
+        
 
     def ask_scrollable_yesno(self, title, header, message):
         """
@@ -905,6 +960,27 @@ class PDFMergerUI:
         self.root.wait_window(msg_win)
     
         return self._choice_result
+    
+    def show_scrollable_info(self, title, header, message):
+        # 建立子視窗
+        msg_win = tk.Toplevel(self.root)
+        msg_win.title(title)
+        msg_win.geometry("700x450")
+    
+        # 設定為模態視窗 (強制聚焦)
+        msg_win.grab_set()
+
+        # 1. 標題與說明
+        tk.Label(msg_win, text=header, font=("Microsoft JhengHei", 11, "bold"), 
+             pady=10, fg="#333333").pack()
+
+        # 2. 帶捲軸的內容區域
+        text_area = scrolledtext.ScrolledText(msg_win, wrap=tk.WORD, width=60, height=15)
+        text_area.insert(tk.INSERT, message)
+        text_area.config(state='disabled') # 設為唯讀
+        text_area.pack(padx=20, pady=10, fill="both", expand=True)
+
+        return
     
 
 if __name__ == "__main__":
