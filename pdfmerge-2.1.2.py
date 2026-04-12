@@ -50,42 +50,22 @@ class PDFMergerUI:
 
         
 
-        # 2. Body:主面板區，用Canvas模擬可捲動的容器
+        # 2. Body:主面板區
         self.main_body = tk.Frame(root, bg="#f5f5f7")
-        self.main_body.pack(fill="both", expand=True, padx=10, pady=10)
+        self.main_body.pack(fill="both", expand=True, padx=(10,5), pady=10)
 
             # 2.1 左側區塊: 可捲動檔案清單
+        self.scrollable_frame = ctk.CTkScrollableFrame(self.main_body, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
+        self.scrollable_frame.pack(side="left", expand=True, fill="both")
 
-        self.container = tk.Frame(self.main_body, bg="#f5f5f7")
-        self.container.pack(side="left", fill="both", expand=True, padx=0, pady=10)
-
-            #設定元件邊框及焦點外框大小為0
-        self.canvas = Canvas(self.container, borderwidth=0, background="#f5f5f7", highlightthickness=0)
-        self.canvas.pack(side="left", fill="both", expand=True)
-        
-        self.scrollbar = ttk.Scrollbar(self.container, orient="vertical", command=self.canvas.yview)
-        self.scrollbar.configure(command=self.canvas.yview) # 拉動scrollbar時更新canvas的捲動位置
-        self.canvas.configure(yscrollcommand=self.scrollbar.set) # canvas垂直捲動時通知scrollbar更新位置
-        self.scrollbar.pack(side="right", fill="y")
-
-            # 將frame加入canvas，貼齊canvas左上角
-        self.scrollable_frame = tk.Frame(self.canvas, background="#f5f5f7")
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor='nw')
-            # 監聽frame的<Configure>事件，位置或大小改變時更新canvas的可捲動範圍
-        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-
-            #2.2 右側區塊: 進階設定側邊欄
-
-        #self.sidebar_frame = tk.Frame(self.main_body, bg="#ffffff", width=280, padx=20, pady=10, highlightthickness=1, highlightbackground="#e1e4e8")
-        #self.sidebar_frame = ctk.CTkFrame(self.main_body, corner_radius=15, fg_color="#ffffff", width=320, border_width=1, border_color="#e1e4e8")
+            # 2.2 右側區塊: 進階設定側邊欄
         self.sidebar_frame = ctk.CTkScrollableFrame(self.main_body, corner_radius=15, fg_color="#ffffff", width=320, border_width=1, border_color="#e1e4e8")
-        #self.sidebar_frame.pack_propagate(False) #禁止子元件影響容器大小
-        self.sidebar_frame.pack(side="right", fill="y", padx=(15,0))
+        self.sidebar_frame.pack(side="right", fill="y", padx=(5,0))
 
         self.sidebar_label = tk.Label(self.sidebar_frame, text="進階設定", font=("Microsoft JhengHei", 13, "bold"), bg="#ffffff", fg="#333333")
         self.sidebar_label.pack()
 
-            #2.2.1 檔案匯入區塊
+            # 2.2.1 檔案匯入區塊
         self.import_files_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
         self.import_files_frame.pack(side="top", fill="x", padx=5, pady=5)
         self.import_files_frame.columnconfigure(0, weight=1)  # 欄位平分
@@ -100,7 +80,7 @@ class PDFMergerUI:
         self.import_path_frame = ctk.CTkFrame(self.import_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
         self.import_path_frame.grid(row=1, column=0, columnspan=2, padx=4, pady=(0,2))
 
-        self.inport_path_label = tk.Label(self.import_path_frame, text="1. 匯入路徑*", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
+        self.inport_path_label = tk.Label(self.import_path_frame, text="1. 選擇資料夾*", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333")
         self.inport_path_label.grid(row=0, column=0, columnspan=2, padx=(10,0), pady=(2,2), sticky="w")
         
 
@@ -199,16 +179,16 @@ class PDFMergerUI:
         #end_label=tk.Label(self.merge_path_frame, text=" 路徑", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333").grid(row=0, column=3, padx=(0,0))
 
             # 2.2.2.2.2 設定的編輯/確認的控制區塊
-        #self.merge_path_control_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
-        #self.merge_path_control_frame.grid(row=2, column=1, padx=(0,10), sticky='n')
+        self.merge_path_control_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
+        self.merge_path_control_frame.grid(row=2, column=1, padx=(0,10), sticky='n')
 
-        #edit_button = ttk.Button(self.merge_path_control_frame, text="✎", width=2, style="Flat.TButton",
-                                     #command=lambda: self.set_path_entry(self.import_path_entry))
-        #edit_button.grid(row=0, column=0)
+        edit_button = ttk.Button(self.merge_path_control_frame, text="✎", width=2, style="Flat.TButton",
+                                     command=lambda: self.set_path_entry(self.import_path_entry))
+        edit_button.grid(row=0, column=0)
 
-        #comfirm_button = ttk.Button(self.merge_path_control_frame, text="✔", width=2, style="Flat.TButton",
-                                     #command=lambda: self.set_path_entry(self.import_path_entry))
-        #comfirm_button.grid(row=0, column=1)
+        comfirm_button = ttk.Button(self.merge_path_control_frame, text="✔", width=2, style="Flat.TButton",
+                                     command=lambda: self.set_path_entry(self.import_path_entry))
+        comfirm_button.grid(row=0, column=1)
 
             # 2.2.2.3 分隔線
         line = tk.Frame(self.export_files_frame, bg="#e1e4e8", height=1)
@@ -247,16 +227,16 @@ class PDFMergerUI:
         #end_label=tk.Label(self.split_path_frame, text=" 路徑", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333").grid(row=0, column=4, padx=(0,0))
 
             # 2.2.2.4.2 設定的編輯/確認的控制區塊
-        #self.split_path_control_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
-        #self.split_path_control_frame.grid(row=4, column=1, padx=(0,10), sticky='n')
+        self.split_path_control_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
+        self.split_path_control_frame.grid(row=4, column=1, padx=(0,10), sticky='n')
 
-        #edit_button = ttk.Button(self.split_path_control_frame, text="✎", width=2, style="Flat.TButton",
-                                     #command=lambda: self.set_path_entry(self.import_path_entry))
-        #edit_button.grid(row=0, column=0)
+        edit_button = ttk.Button(self.split_path_control_frame, text="✎", width=2, style="Flat.TButton",
+                                     command=lambda: self.set_path_entry(self.import_path_entry))
+        edit_button.grid(row=0, column=0)
 
-        #comfirm_button = ttk.Button(self.split_path_control_frame, text="✔", width=2, style="Flat.TButton",
-                                     #command=lambda: self.set_path_entry(self.import_path_entry))
-        #comfirm_button.grid(row=0, column=1)
+        comfirm_button = ttk.Button(self.split_path_control_frame, text="✔", width=2, style="Flat.TButton",
+                                     command=lambda: self.set_path_entry(self.import_path_entry))
+        comfirm_button.grid(row=0, column=1)
 
       
             # 2.2.3 設定頁面區塊
@@ -269,11 +249,12 @@ class PDFMergerUI:
         self.default_range_text = "全部 或 輸入頁碼範圍（如 1-3,5,8-9）"
         
             # 設定頁面標題
-        self.page_label = tk.Label(self.set_page_frame, text="設定頁面", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
+        self.page_label = tk.Label(self.set_page_frame, text="快速設定頁碼", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
         self.page_label.grid(row=0, column=0, columnspan=2, pady=(12,4))
-        
+
+            # 2.2.3.1 
             # 設定下拉選單
-        self.combobox = ttk.Combobox(self.set_page_frame, values=["請選擇","全部", "第○頁", "第○-○頁", "前○頁", "後○頁", "最後一頁"], state="readonly", width=11)
+        self.combobox = ttk.Combobox(self.set_page_frame, values=["請選擇","全部", "前○頁", "第○頁", "第○-○頁", "第○-倒數第○頁", "後○頁", "最後一頁"], state="readonly", width=11)
         self.combobox.set("請選擇")
         self.combobox.grid(row=1, column=0, padx=8, pady=(0,4), ipady=3, sticky="e")
 
@@ -297,27 +278,27 @@ class PDFMergerUI:
 
 
             # 一鍵新增按鈕
-        self.add_all_pages_button = ttk.Button(self.set_page_frame, text="📚 一鍵新增",
+        self.add_all_pages_button = ttk.Button(self.set_page_frame, text="新增",
                                      command=lambda: self.add_to_customized_entries(self.entry_var.get())
                                      )
         self.add_all_pages_button.grid(row=3, column=0, padx=8, pady=(4,4), sticky="e")
 
 
             # 一鍵設定按鈕
-        self.set_all_pages_button = ttk.Button(self.set_page_frame, text="📚 一鍵取代",
+        self.set_all_pages_button = ttk.Button(self.set_page_frame, text="套用",
                                      command=lambda: self.set_customized_entries(self.entry_var.get()) if self.entry_var.get()!="全部" else self.set_all_to_all_pages()
                                      )
         self.set_all_pages_button.grid(row=3, column=1, padx=8, pady=(4,4), sticky="w")
 
 
             #一鍵刪除按鈕
-        self.clear_all_pages_button = ttk.Button(self.set_page_frame, text="📚 一鍵清空",
+        self.clear_all_pages_button = ttk.Button(self.set_page_frame, text="清空",
                                      command=lambda: self.clear_customized_entries()
                                      )
         self.clear_all_pages_button.grid(row=4, column=0, padx=8, pady=(4,10), sticky="e")
     
             #一鍵排序按鈕
-        self.sort_all_pages_button = ttk.Button(self.set_page_frame, text="📚 一鍵排序",
+        self.sort_all_pages_button = ttk.Button(self.set_page_frame, text="排序",
                                      command=lambda: self.sort_customized_entries()
                                      )
         self.sort_all_pages_button.grid(row=4, column=1, padx=8, pady=(4,10), sticky="w")
@@ -515,6 +496,11 @@ class PDFMergerUI:
             if new_text.startswith("第") and new_text.endswith("頁"):
                 middle_part = new_text[1:-1]
                 return middle_part.count("-") < 2 and all((c.isdigit() or c=="○" or c=="") for c in middle_part.split("-"))
+
+        elif template == "第○-倒數第○頁":
+            if new_text.startswith("第") and new_text.endswith("頁"):
+                middle_part = new_text[:-1]
+                return "-倒數第" in middle_part
         
         return False
 
@@ -631,12 +617,14 @@ class PDFMergerUI:
 
     def match_range(self, range_text, pages_count):
         try:
+            range_text = range_text.strip()
+            
             #將輸入範圍轉換成指定格式
             pattern = r'(全部|[0-9-]+)'
             matches = re.findall(pattern, range_text)#設定匹配的正則表達式
             pages_locator = ''.join(matches)
 
-            if range_text.startswith("前") and range_text.endswith("頁"):
+            if re.fullmatch(r"前\d+頁", range_text):
 
                 #計算結束頁，並使其不超過總頁數
                 end_page = min(int(pages_locator), pages_count)
@@ -648,7 +636,7 @@ class PDFMergerUI:
                 else:
                     return ""
 
-            elif range_text.startswith("後") and range_text.endswith("頁"):
+            elif re.fullmatch(r"後\d+頁", range_text):
 
                 #計算起始頁，並使其不低於1頁
                 start_page = max(1, pages_count-int(pages_locator)+1)
@@ -660,7 +648,7 @@ class PDFMergerUI:
                 else:
                     return ""
 
-            elif range_text.startswith("第") and range_text.endswith("頁"):
+            elif re.fullmatch(r"第\d+(-\d+)?頁", range_text):
                 pages = [int(item) for item in pages_locator.split("-")]
                 
                 #設定多頁
@@ -679,15 +667,22 @@ class PDFMergerUI:
                 #非預期設定
                 else:
                     return ""
+                
+            elif re.fullmatch(r"第\d+-倒數第\d+頁", range_text):
+                pages = re.findall(r"\d+", range_text)
+                end_page = str(pages_count - int(pages[1]) + 1) if pages_count>int(pages[1]) else "1"
+                return pages[0]+"-"+end_page
 
-            elif range_text == "最後一頁":
+            elif range_text.strip() == "最後一頁":
                 return str(pages_count)
             
-            elif range_text == "全部":
+            elif range_text.strip() == "全部":
                 return "全部"
-            
-            elif re.fullmatch(r"^\d+-\d+$",range_text.strip()) or re.fullmatch(r"^\d+",range_text.strip()):
-                return range_text.strip()
+
+            # 若為合法且轉換後的輸入，直接return原輸入(已去除多餘空白)
+            elif re.fullmatch(r"\d+-\d+",range_text) or re.fullmatch(r"\d+",range_text):
+                return range_text
+
             else:
                 return ""
 
@@ -806,13 +801,22 @@ class PDFMergerUI:
         file_frame.destroy()
 
     def remove_all_pdfs(self):
-        for _,_,file_frame,_ in self.pdf_files:
-            file_frame.destroy()
-        self.pdf_files = []
+        result = False
+        if self.pdf_files:
+            result = messagebox.askyesno("移除確認", "是否移除所有pdf？")
+    
+        if result:
+            for _,_,file_frame,_ in self.pdf_files:
+                file_frame.destroy()
+            self.pdf_files = []
 
     def merge_pdfs(self):
         writer = PdfWriter()
         try:
+            #無檔案時直接離開
+            if not self.pdf_files:
+                return
+
             for pdf_path, entry, _, reader in self.pdf_files:
                 pages_count = len(reader.pages)
                 page_input = entry.get()
@@ -854,6 +858,10 @@ class PDFMergerUI:
             return target_path
         
         try:
+            #無檔案時直接離開
+            if not self.pdf_files:
+                return
+            
             writers = []
             source_paths = []
             for pdf_path, entry, _, reader in self.pdf_files:
@@ -877,7 +885,11 @@ class PDFMergerUI:
             # 由使用者選擇匯出路徑
             output_paths = []
             if self.split_path_option.get()=="A":
-                output_paths.extend( [ Path(filedialog.askdirectory(title="請選擇匯出路徑")) ] * len(writers) )
+                output_path = filedialog.askdirectory(title="請選擇匯出路徑")
+                if output_path:
+                    output_paths.extend( [ Path(output_path) ] * len(writers) )
+                else:
+                    return
             # 匯出至原檔案資料夾    
             elif self.split_path_option.get()=="B":
                 output_paths = [ path.parent for path in source_paths] # 取得來原檔案所屬資料夾
@@ -887,9 +899,15 @@ class PDFMergerUI:
                 if Path(self.custom_split_path.get()).exists():
                     output_paths.extend( [self.custom_split_path.get()] * len(writers) )
                 else:
-                    messagebox.showerror("匯出錯誤", "自訂的路徑不存在。\n")
+                    messagebox.showerror("匯出錯誤", "自訂路徑不存在。\n")
+                    return
         except Exception as e:
             messagebox.showerror("錯誤", f"分割時發生錯誤：{e}")
+            return
+
+        #再次向使用者確認是否分割
+        result = messagebox.askyesno("分割提醒", "是否開始分割?")
+        if not result:
             return
 
             # 依序匯出檔案
