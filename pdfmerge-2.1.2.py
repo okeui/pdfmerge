@@ -112,7 +112,7 @@ class PDFMergerUI:
 
             # 關鍵字說明按鈕
         self.hint_button = ttk.Button(self.keyword_frame, text="？", width=2,
-                                     command=lambda: messagebox.showinfo("提示", "1.請輸入檔案路徑中包含的關鍵字，並以空格或\",\"區隔。\n2.將匯入選取資料夾中，路徑包含所有關鍵字的檔案。"))
+                                     command=lambda: messagebox.showinfo("提示", "1.輸入檔案名稱(含路徑)中的關鍵字，並以空格或\",\"區隔。\n2.點選「匯入」按鈕後，系統將選擇性匯入路徑包含所有關鍵字的檔案。"))
         self.hint_button.grid(row=1, column=1, padx=(2,8), pady=(0,0), sticky="w")
 
             # 2.2.1.3 分隔線 
@@ -146,6 +146,9 @@ class PDFMergerUI:
         line.grid(row=1, column=0, sticky="ew", padx=20, pady=(8,8), columnspan=2)
 
 
+            # 2.2.2.2.0 初始化路徑的可編輯狀態
+        self.initialize_path_editable()
+        
             # 2.2.2.2.1 設定合併路徑
         self.merge_path_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
         self.merge_path_frame.grid(row=2, column=0, padx=4, pady=(0,0))
@@ -158,7 +161,7 @@ class PDFMergerUI:
         self.merge_path_label.grid(row=0, column=0, padx=(0,0), sticky="w")
 
         self.merge_path_option = tk.StringVar(value="A")
-        self.merge_r1 = ttk.Radiobutton(self.merge_path_frame, text="預設", variable=self.merge_path_option, value="A", style="My.TRadiobutton")
+        self.merge_r1 = ttk.Radiobutton(self.merge_path_frame, text="預設（每次皆詢問）", variable=self.merge_path_option, value="A", style="My.TRadiobutton")
         self.merge_r1.grid(row=1, column=0, padx=(2,0), pady=(0,0), sticky="w")
 
         #用一個frame包裝自訂選項
@@ -178,17 +181,21 @@ class PDFMergerUI:
         
         #end_label=tk.Label(self.merge_path_frame, text=" 路徑", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333").grid(row=0, column=3, padx=(0,0))
 
+
             # 2.2.2.2.2 設定的編輯/確認的控制區塊
         self.merge_path_control_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
         self.merge_path_control_frame.grid(row=2, column=1, padx=(0,10), sticky='n')
 
-        edit_button = ttk.Button(self.merge_path_control_frame, text="✎", width=2, style="Flat.TButton",
-                                     command=lambda: self.set_path_entry(self.import_path_entry))
-        edit_button.grid(row=0, column=0)
+        self.merge_path_edit = ttk.Button(self.merge_path_control_frame, text="✎", width=2, style="Flat.TButton",
+                                     command=lambda: self.change_merge_path_editable())
+        self.merge_path_edit.grid(row=0, column=1)
 
-        comfirm_button = ttk.Button(self.merge_path_control_frame, text="✔", width=2, style="Flat.TButton",
-                                     command=lambda: self.set_path_entry(self.import_path_entry))
-        comfirm_button.grid(row=0, column=1)
+        self.merge_path_comfirm = ttk.Button(self.merge_path_control_frame, text="✔", width=2, style="Flat.TButton",
+                                     command=lambda: self.change_merge_path_editable())
+        self.merge_path_comfirm.grid(row=0, column=0)
+
+        #先改變可編輯狀態為為readonly
+        self.change_merge_path_editable()
 
             # 2.2.2.3 分隔線
         line = tk.Frame(self.export_files_frame, bg="#e1e4e8", height=1)
@@ -205,7 +212,7 @@ class PDFMergerUI:
         self.split_path_label.grid(row=0, column=0, padx=(0,0), sticky="w")
             
         self.split_path_option = tk.StringVar(value="A")
-        self.split_r1 = ttk.Radiobutton(self.split_path_frame, text="預設", variable=self.split_path_option, value="A", style="My.TRadiobutton")
+        self.split_r1 = ttk.Radiobutton(self.split_path_frame, text="預設（每次皆詢問）", variable=self.split_path_option, value="A", style="My.TRadiobutton")
         self.split_r2 = ttk.Radiobutton(self.split_path_frame, text="原檔案路徑", variable=self.split_path_option, value="B", style="My.TRadiobutton")
         self.split_r1.grid(row=1, column=0, padx=(2,0), pady=(0,0), sticky="w")
         self.split_r2.grid(row=2, column=0, padx=(2,0), pady=(0,0), sticky="w")
@@ -226,17 +233,22 @@ class PDFMergerUI:
         self.custom_split_button.grid(row=0, column=2, padx=(2,0), sticky="w")
         #end_label=tk.Label(self.split_path_frame, text=" 路徑", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#333333").grid(row=0, column=4, padx=(0,0))
 
+
             # 2.2.2.4.2 設定的編輯/確認的控制區塊
         self.split_path_control_frame = ctk.CTkFrame(self.export_files_frame, corner_radius=15, fg_color="#ffffff",  border_width=0, border_color="#e1e4e8")
         self.split_path_control_frame.grid(row=4, column=1, padx=(0,10), sticky='n')
 
-        edit_button = ttk.Button(self.split_path_control_frame, text="✎", width=2, style="Flat.TButton",
-                                     command=lambda: self.set_path_entry(self.import_path_entry))
-        edit_button.grid(row=0, column=0)
+        self.split_path_edit = ttk.Button(self.split_path_control_frame, text="✎", width=2, style="Flat.TButton",
+                                     command=lambda: self.change_split_path_editable())
+        self.split_path_edit.grid(row=0, column=1)
 
-        comfirm_button = ttk.Button(self.split_path_control_frame, text="✔", width=2, style="Flat.TButton",
-                                     command=lambda: self.set_path_entry(self.import_path_entry))
-        comfirm_button.grid(row=0, column=1)
+        self.split_path_comfirm = ttk.Button(self.split_path_control_frame, text="✔", width=2, style="Flat.TButton",
+                                     command=lambda: self.change_split_path_editable())
+        self.split_path_comfirm.grid(row=0, column=0)
+
+
+        #先改變可編輯狀態為為readonly
+        self.change_split_path_editable()
 
       
             # 2.2.3 設定頁面區塊
@@ -278,45 +290,48 @@ class PDFMergerUI:
 
 
             # 一鍵新增按鈕
-        self.add_all_pages_button = ttk.Button(self.set_page_frame, text="新增",
+        self.add_all_pages_button = ttk.Button(self.set_page_frame, text="新增至所有",
                                      command=lambda: self.add_to_customized_entries(self.entry_var.get())
                                      )
         self.add_all_pages_button.grid(row=3, column=0, padx=8, pady=(4,4), sticky="e")
 
 
             # 一鍵設定按鈕
-        self.set_all_pages_button = ttk.Button(self.set_page_frame, text="套用",
+        self.set_all_pages_button = ttk.Button(self.set_page_frame, text="套用至所有",
                                      command=lambda: self.set_customized_entries(self.entry_var.get()) if self.entry_var.get()!="全部" else self.set_all_to_all_pages()
                                      )
         self.set_all_pages_button.grid(row=3, column=1, padx=8, pady=(4,4), sticky="w")
 
+            # 分隔線
+        line = tk.Frame(self.set_page_frame, bg="#e1e4e8", height=2)
+        line.grid(row=4, column=0, sticky="ew", padx=20, pady=(8,8), columnspan=2)
 
             #一鍵刪除按鈕
-        self.clear_all_pages_button = ttk.Button(self.set_page_frame, text="清空",
+        self.clear_all_pages_button = ttk.Button(self.set_page_frame, text="一鍵清除",
                                      command=lambda: self.clear_customized_entries()
                                      )
-        self.clear_all_pages_button.grid(row=4, column=0, padx=8, pady=(4,10), sticky="e")
+        self.clear_all_pages_button.grid(row=5, column=0, padx=8, pady=(4,20), sticky="e")
     
             #一鍵排序按鈕
-        self.sort_all_pages_button = ttk.Button(self.set_page_frame, text="排序",
+        self.sort_all_pages_button = ttk.Button(self.set_page_frame, text="一鍵排序",
                                      command=lambda: self.sort_customized_entries()
                                      )
-        self.sort_all_pages_button.grid(row=4, column=1, padx=8, pady=(4,10), sticky="w")
+        self.sort_all_pages_button.grid(row=5, column=1, padx=8, pady=(4,20), sticky="w")
 
 
             #2.2.4 分割設定區塊
-        self.set_split_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
+        '''self.set_split_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
         self.set_split_frame.pack(side="top", fill="x", padx=5, pady=5)
         self.merge_label = tk.Label(self.set_split_frame, text="分割設定", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
-        self.merge_label.pack(pady=(5,5))
+        self.merge_label.pack(pady=(5,5))'''
 
         
 
             #2.2.5 合併設定區塊
-        self.set_merge_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
+        '''self.set_merge_frame = ctk.CTkFrame(self.sidebar_frame, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
         self.set_merge_frame.pack(side="top", fill="x", padx=5, pady=5)
         self.merge_label = tk.Label(self.set_merge_frame, text="合併設定", font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#333333")
-        self.merge_label.pack(pady=(5,5))
+        self.merge_label.pack(pady=(5,5))'''
         
         # 3. Footer:設定底部功能區
         self.footer = tk.Frame(root, bg="#ffffff", pady=15, highlightthickness=1, highlightbackground="#dddddd")
@@ -325,7 +340,6 @@ class PDFMergerUI:
             # 3.1 操作列
         self.control_frame = tk.Frame(self.footer, bg="#ffffff")
         self.control_frame.pack()
-
 
             # 新增pdf按鈕
         self.add_button = ttk.Button(self.control_frame, text="➕ 新增 PDF",width=12,
@@ -347,7 +361,53 @@ class PDFMergerUI:
             # 分割PDF按鈕
         self.split_button = ttk.Button(self.control_frame, text="🔄 開始分割", width=12,
                                        command=self.split_pdfs).grid(row=0, column=4, padx=5)
+    #設定匯出路徑的可編輯狀態
+    def initialize_path_editable(self):
+        self.__merge_path_editable = True
+        self.__split_path_editable = True
 
+        
+    def change_merge_path_editable(self):
+        if self.__merge_path_editable:
+            self.merge_path_edit.configure(state="normal")
+            self.merge_path_comfirm.configure(state="disabled")
+            self.merge_r1.configure(state="disabled")
+            self.merge_r2.configure(state="disabled")
+            self.custom_merge_path.configure(state="disabled")
+            self.custom_merge_button.configure(state="disabled")
+            self.__merge_path_editable = False
+        else:
+            self.merge_path_edit.configure(state="disabled")
+            self.merge_path_comfirm.configure(state="normal")
+            self.merge_r1.configure(state="normal")
+            self.merge_r2.configure(state="normal")
+            self.custom_merge_path.configure(state="normal")
+            self.custom_merge_button.configure(state="normal")
+            self.__merge_path_editable = True
+
+    def change_split_path_editable(self):
+        if self.__split_path_editable:
+            self.split_path_edit.configure(state="normal")
+            self.split_path_comfirm.configure(state="disabled")
+            self.split_r1.configure(state="disabled")
+            self.split_r2.configure(state="disabled")
+            self.split_r3.configure(state="disabled")
+            self.custom_split_path.configure(state="disabled")
+            self.custom_split_button.configure(state="disabled")
+            self.__split_path_editable = False
+            return
+        else:
+            self.split_path_edit.configure(state="disabled")
+            self.split_path_comfirm.configure(state="normal")
+            self.split_r1.configure(state="normal")
+            self.split_r2.configure(state="normal")
+            self.split_r3.configure(state="normal")
+            self.custom_split_path.configure(state="normal")
+            self.custom_split_button.configure(state="normal")
+            self.__split_path_editable = True
+            
+            
+        
     def manual_add_pdfs(self):
         file_paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
         self.add_pdfs(file_paths)
@@ -811,8 +871,13 @@ class PDFMergerUI:
             self.pdf_files = []
 
     def merge_pdfs(self):
-        writer = PdfWriter()
         try:
+            if self.__merge_path_editable:
+                messagebox.showwarning("提醒","請先儲存匯出路徑設定。")
+                return
+
+            writer = PdfWriter()
+            
             #無檔案時直接離開
             if not self.pdf_files:
                 return
@@ -858,6 +923,10 @@ class PDFMergerUI:
             return target_path
         
         try:
+            if self.__split_path_editable:
+                messagebox.showwarning("提醒","請先儲存匯出路徑設定。")
+                return
+                
             #無檔案時直接離開
             if not self.pdf_files:
                 return
