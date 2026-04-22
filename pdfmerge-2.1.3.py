@@ -10,6 +10,7 @@ from tkinter import ttk
 from PyPDF2 import PdfReader, PdfWriter
 from PIL import Image, ImageTk  # 用來顯示縮圖
 from pdf2image import convert_from_path
+from tkinterdnd2 import TkinterDnD, DND_FILES
 
 #例外處理
 import _tkinter
@@ -57,6 +58,7 @@ class PDFMergerUI:
             # 2.1 左側區塊: 可捲動檔案清單
         self.scrollable_frame = ctk.CTkScrollableFrame(self.main_body, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
         self.scrollable_frame.pack(side="left", expand=True, fill="both")
+        self._register_drop(self.scrollable_frame)
 
             # 2.2 右側區塊: 進階設定側邊欄
         self.sidebar_frame = ctk.CTkScrollableFrame(self.main_body, corner_radius=15, fg_color="#ffffff", width=320, border_width=1, border_color="#e1e4e8")
@@ -730,8 +732,12 @@ class PDFMergerUI:
                 
             elif re.fullmatch(r"第\d+-倒數第\d+頁", range_text):
                 pages = re.findall(r"\d+", range_text)
-                end_page = str(pages_count - int(pages[1]) + 1) if pages_count>int(pages[1]) else "1"
-                return pages[0]+"-"+end_page
+
+                start_page = int(pages[0])
+                start_page = min(max(1,start_page), pages_count)
+                end_page = pages_count - int(pages[1]) + 1
+                end_page = min(max(1, end_page), pages_count)
+                return str(start_page)+"-"+str(end_page)
 
             elif range_text.strip() == "最後一頁":
                 return str(pages_count)
@@ -924,7 +930,7 @@ class PDFMergerUI:
         
         try:
             if self.__split_path_editable:
-                messagebox.showwarning("提醒","請先儲存匯出路徑設定。")
+                messagebox.showwarning("提醒","請先儲存匯出路徑。")
                 return
                 
             #無檔案時直接離開
@@ -1069,6 +1075,44 @@ class PDFMergerUI:
         text_area.pack(padx=20, pady=10, fill="both", expand=True)
 
         return
+
+    def _register_drop(self, widget, _visited=None):
+        """為區塊及區塊內所有元件註冊拖曳檔案事件"""
+        if _visited==None:
+            _visited = set()
+
+        # 用 widget 的 id 判斷是否已處理過
+        widget_id = id(widget) #依元件的記憶體位置給定id
+        if widget_id in _visited:
+            return
+        _visited.add(widget_id)
+        
+        try:
+            origin_widget = widget
+            
+            #ctk.frame不一定支持drop_target_register，需取得底層真實的 tk widget 來註冊
+            if isinstance(widget, ctk.CTkScrollableFrame):
+                widget = widget._parent_canvas
+
+            elif isinstance(widget, ctk.CTkBaseClass):
+                widget = widget._canvas if hasattr(widget, "_canvas") else None
+            widget.drop_target_register(DND_FILES)
+            widget.dnd_bind("<<Drop>>", self._on_files_drop)
+        except Exception as e:
+            print(e)
+    
+        # 遞迴註冊所有子元件
+        for child in origin_widget.winfo_children():
+            try:
+                self._register_drop(child, _visited)
+            except Exception as e:
+                print(e)
+        
+    def _on_files_drop(self, event):
+        """滑鼠拖曳事件"""
+        file_paths = event.widget.tk.splitlist(event.data)
+        self.add_pdfs(file_paths)
+        
         
         
 if __name__ == "__main__":
@@ -1081,6 +1125,7 @@ if __name__ == "__main__":
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         pass
-    root = Tk()
+    #root = Tk()
+    root = TkinterDnD.Tk()
     app = PDFMergerUI(root)
     root.mainloop()
