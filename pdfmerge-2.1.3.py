@@ -1,4 +1,4 @@
-import os, ctypes, re, sys
+import os, ctypes, re, sys, subprocess
 from pathlib import Path
 #from tkinter import Tk, Button, Label, Entry, filedialog, Frame, Scrollbar, Canvas, messagebox, Toplevel, StringVar
 #from tkinter.ttk import Combobox
@@ -17,11 +17,25 @@ import _tkinter
 from PyPDF2.errors import PdfReadError
 
 #POPPLER_PATH = r".\poppler-24.08.0\Library\bin"
+if sys.platform == "win32":
+    _original_popen = subprocess.Popen
+
+    class _HiddenPopen(_original_popen):
+        def __init__(self, *args, **kwargs):
+            if 'startupinfo' not in kwargs:
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                kwargs['startupinfo'] = startupinfo
+            super().__init__(*args, **kwargs)
+
+    subprocess.Popen = _HiddenPopen
+
 
 class PDFMergerUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("📄 PDF 合併工具")
+        self.root.title("PDF 合併工具")
         self.root.geometry("1100x750")
         self.root.configure(bg="#f5f5f7") # 現代感的淺灰色背景
 
@@ -55,10 +69,21 @@ class PDFMergerUI:
         self.main_body = tk.Frame(root, bg="#f5f5f7")
         self.main_body.pack(fill="both", expand=True, padx=(10,5), pady=10)
 
-            # 2.1 左側區塊: 可捲動檔案清單
+            # 2.1 左側區塊: 可捲動檔案區塊(有檔案時顯示)、可拖曳檔案區塊(無檔案時顯示)
+
+        #有檔案時顯示可捲動的frame
         self.scrollable_frame = ctk.CTkScrollableFrame(self.main_body, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
-        self.scrollable_frame.pack(side="left", expand=True, fill="both")
-        self._register_drop(self.scrollable_frame)
+        self._register_drop(self.scrollable_frame) #監聽拖曳事件
+        #self.scrollable_frame.pack(side="left", expand=True, fill="both")
+
+        #無檔案時顯示有拖曳提示的frame
+        self.draggable_frame = ctk.CTkFrame(self.main_body, corner_radius=15, fg_color="#ffffff",  border_width=1, border_color="#e1e4e8")
+        self.drag_files_label = tk.Label(self.draggable_frame, text="拖曳檔案至此\n或點此新增檔案", font=("Microsoft JhenHei", 13, "bold"), bg="#ffffff", fg="#9E9E9E")
+        self.drag_files_label.pack(expand=True)
+        self._register_drop(self.draggable_frame) #監聽拖曳事件
+        self._register_click(self.draggable_frame) #監聽點擊事件
+        
+        self._refresh_main_body()
 
             # 2.2 右側區塊: 進階設定側邊欄
         self.sidebar_frame = ctk.CTkScrollableFrame(self.main_body, corner_radius=15, fg_color="#ffffff", width=320, border_width=1, border_color="#e1e4e8")
@@ -113,9 +138,13 @@ class PDFMergerUI:
 
 
             # 關鍵字說明按鈕
-        self.hint_button = ttk.Button(self.keyword_frame, text="？", width=2,
-                                     command=lambda: messagebox.showinfo("提示", "1.輸入檔案名稱(含路徑)中的關鍵字，並以空格或\",\"區隔。\n2.點選「匯入」按鈕後，系統將選擇性匯入路徑包含所有關鍵字的檔案。"))
-        self.hint_button.grid(row=1, column=1, padx=(2,8), pady=(0,0), sticky="w")
+        self.search_button = ttk.Button(self.keyword_frame, text="🔎", width=2,
+                                     command=lambda:self.show_matched_files())
+        self.search_button.grid(row=1, column=1, padx=(2,8), pady=(0,0), sticky="w")
+        
+        #self.hint_button = ttk.Button(self.keyword_frame, text="？", width=2,
+                                     #command=lambda: messagebox.showinfo("提示", "1.輸入檔案名稱(含路徑)中的關鍵字，並以空格或\",\"區隔。\n2.點選「匯入」按鈕後，系統將選擇性匯入路徑包含所有關鍵字的檔案。"))
+        #self.hint_button.grid(row=1, column=1, padx=(2,8), pady=(0,0), sticky="w")
 
             # 2.2.1.3 分隔線 
         line = tk.Frame(self.import_files_frame, bg="#e1e4e8", height=2)
@@ -353,7 +382,7 @@ class PDFMergerUI:
 
             
             # 設為全部頁面的按鈕
-        self.set_all_button = ttk.Button(self.control_frame, text="📚 一鍵設為全部", width=15, command=self.set_all_to_all_pages)
+        self.set_all_button = ttk.Button(self.control_frame, text="📚 設為全部頁面", width=15, command=self.set_all_to_all_pages)
         self.set_all_button.grid(row=0, column=2, padx=5)
 
             # 合併PDF按鈕
@@ -407,8 +436,30 @@ class PDFMergerUI:
             self.custom_split_path.configure(state="normal")
             self.custom_split_button.configure(state="normal")
             self.__split_path_editable = True
-            
-            
+
+    def _get_matched_files(self, base_path, keywords):
+        file_paths = []
+        
+        #遞迴搜尋所有子資料夾與檔案
+        for p in base_path.rglob("*"):
+            if p.is_file() and p.suffix.lower() == ".pdf":
+                path_str = str(p)
+
+                if all(key in path_str for key in keywords):
+                        file_paths.append(path_str)
+        return file_paths
+
+    def show_matched_files(self):
+        str_base_path = self.import_path_entry.get().strip()
+        base_path = Path(str_base_path)
+        keywords = re.split(r'[ ,]+', self.keyword_entry.get())
+
+        file_paths = self._get_matched_files(base_path, keywords)
+        if file_paths:
+            self.show_scrollable_info("查尋結果", "符合的檔案如下：", "\n".join(file_paths))
+        else:
+            messagebox.showinfo("查無結果", f"無匹配檔案，或是路徑{str_base_path}不存在。")
+        
         
     def manual_add_pdfs(self):
         file_paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
@@ -428,23 +479,22 @@ class PDFMergerUI:
             messagebox.showerror("匯入失敗", f"路徑{str_base_path}不存在。")
             return
                 
-        file_paths = []
         keywords = re.split(r'[ ,]+', self.keyword_entry.get())
+        file_paths = self._get_matched_files(base_path, keywords)
 
         #遞迴搜尋所有子資料夾與檔案
-        for p in base_path.rglob("*"):
-            if p.is_file() and p.suffix.lower() == ".pdf":
-                path_str = str(p)
+        #for p in base_path.rglob("*"):
+        #    if p.is_file() and p.suffix.lower() == ".pdf":
+        #        path_str = str(p)
 
-                if all(key in path_str for key in keywords):
-                        file_paths.append(path_str)
+        #        if all(key in path_str for key in keywords):
+              #           file_paths.append(path_str)
         if file_paths:
             start_import = self.ask_scrollable_yesno("匯入確認","將批次匯入以下檔案:","\n".join(file_paths))
             if start_import:
                 self.add_pdfs(file_paths)
         else:
             messagebox.showwarning("匯入失敗", f"沒有符合條件的檔案")
-        
 
     def add_pdfs(self, file_paths):
         for file_path in file_paths:
@@ -469,7 +519,9 @@ class PDFMergerUI:
                 menu_frame.pack(side="left", fill="both", expand="True", padx=15)
                 
                 # 建立檔名標籤 
-                file_label = tk.Label(menu_frame, text="📄 "+os.path.basename(file_path)+" （共"+str(pages_count)+"頁）",
+                basename = str(os.path.basename(file_path))
+                basename = basename if len(basename)<25 else "..."+basename[len(basename)-25:len(basename)-4]+".pdf"
+                file_label = tk.Label(menu_frame, text="📄 "+basename+" （共"+str(pages_count)+"頁）",
                          font=("Microsoft JhengHei", 11, "bold"), bg="#ffffff", fg="#0366d6")
                 #file_label.pack(anchor="w")
                 file_label.grid(row=0, column=0, pady=(0,15), sticky="w")
@@ -511,7 +563,11 @@ class PDFMergerUI:
                     preview_button.image = preview_image  # 防止圖片被垃圾回收
                     preview_button.pack(side="bottom")
 
+                #註冊並使所有元件能監聽拖曳事件
+                self._register_drop(file_frame)
+
                 self.pdf_files.append((file_path, page_entry, file_frame, reader))
+            self._refresh_main_body()
 
     def set_path_entry(self, entry):
         folder_path = filedialog.askdirectory(title="請選擇一個資料夾")
@@ -794,13 +850,14 @@ class PDFMergerUI:
         try:
             POPPLER_PATH = self.get_poppler_path()
             images = convert_from_path(pdf_path, first_page=1, last_page=1, size=(100, 100), poppler_path=POPPLER_PATH)
+            #images = convert_from_path(pdf_path ,first_page=1, last_page=1, size=(None,100), dpi=200, poppler_path=POPPLER_PATH)
             if images:
                 return images[0]
         except Exception as e:
             print("縮圖錯誤:", e)
         return None
 
-    def preview_pdf(self, pdf_path):
+    '''def preview_pdf(self, pdf_path):
         try:
             # 用高 DPI 轉圖片，但不指定尺寸，保留原始大小比例
             POPPLER_PATH = self.get_poppler_path()
@@ -834,6 +891,65 @@ class PDFMergerUI:
             top.geometry("800x1000")
 
         except Exception as e:
+            messagebox.showerror("預覽錯誤", f"無法顯示預覽：{e}")'''
+    def preview_pdf(self, pdf_path):
+        try:
+            POPPLER_PATH = self.get_poppler_path()
+
+            # 用高 DPI 轉換以保留清晰度，之後再縮放回正確尺寸
+            RENDER_DPI = 200
+            images = convert_from_path(pdf_path, first_page=1, last_page=1, dpi=RENDER_DPI, poppler_path=POPPLER_PATH)
+            if not images:
+                messagebox.showwarning("預覽失敗", "無法產生預覽圖片。")
+                return
+
+            top = Toplevel(self.root)
+            top.title("預覽放大圖")
+
+            enlarged_image = images[0]
+            img_width_px, img_height_px = enlarged_image.size  # 目前是 200dpi 的像素數
+
+            # 取得螢幕實際 DPI
+            screen_dpi = self.root.winfo_fpixels('1i')  # 每英吋對應的螢幕像素數
+
+            # 將圖片縮放成「螢幕上實際大小 = PDF 原始大小」
+            # 原始 PDF 尺寸（英吋）= 像素 / RENDER_DPI
+            # 螢幕顯示像素 = 原始尺寸（英吋）* 螢幕 DPI
+            scale = screen_dpi / RENDER_DPI
+            display_width = int(img_width_px * scale)
+            display_height = int(img_height_px * scale)
+
+            resized_image = enlarged_image.resize((display_width, display_height), Image.LANCZOS)
+
+            # 限制視窗最大顯示尺寸
+            max_win_width = 1200
+            max_win_height = 1000
+            win_width = min(display_width + 20, max_win_width)
+            win_height = min(display_height + 20, max_win_height)
+            top.geometry(f"{win_width}x{win_height}")
+
+            frame = ttk.Frame(top)
+            frame.pack(fill="both", expand=True)
+
+            canvas = Canvas(frame)
+            v_scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+            h_scrollbar = ttk.Scrollbar(frame, orient="horizontal", command=canvas.xview)
+
+            canvas.configure(
+                yscrollcommand=v_scrollbar.set,
+                xscrollcommand=h_scrollbar.set
+            )
+
+            v_scrollbar.pack(side="right", fill="y")
+            h_scrollbar.pack(side="bottom", fill="x")
+            canvas.pack(side="left", fill="both", expand=True)
+
+            tk_image = ImageTk.PhotoImage(resized_image)
+            canvas.image = tk_image
+            canvas.create_image(0, 0, image=tk_image, anchor="nw")
+            canvas.config(scrollregion=(0, 0, display_width, display_height))
+
+        except Exception as e:
             messagebox.showerror("預覽錯誤", f"無法顯示預覽：{e}")
         
     def parse_pages(self, input_str, max_page):
@@ -865,6 +981,7 @@ class PDFMergerUI:
     def remove_pdf(self, file_frame):
         self.pdf_files = [item for item in self.pdf_files if item[2] != file_frame]
         file_frame.destroy()
+        self._refresh_main_body()
 
     def remove_all_pdfs(self):
         result = False
@@ -875,8 +992,31 @@ class PDFMergerUI:
             for _,_,file_frame,_ in self.pdf_files:
                 file_frame.destroy()
             self.pdf_files = []
+            self._refresh_main_body()
 
     def merge_pdfs(self):
+        def get_unique_output_path(original_path, suffix="merge"):
+            """
+            original_path: 原檔案路徑 (str 或 Path)
+            suffix: 想要加在原檔名後的字串
+            """
+            folder = Path(original_path)
+            # 組合初始的輸出路徑：原資料夾 / (原檔名 + 字尾 + .pdf)
+            #folder = p.parent
+            #base_name = p.stem  # 取得不含副檔名的檔名
+            #ext = p.suffix     # 取得副檔名 (.pdf)
+    
+            # 初始目標路徑
+            target_path = folder / f"{suffix}.pdf"
+    
+            counter = 1
+            # 如果檔案已經存在，就進入迴圈尋找下一個可用的序號
+            while target_path.exists():
+                target_path = folder / f"{suffix}({counter}).pdf"
+                counter += 1
+        
+            return target_path
+        
         try:
             if self.__merge_path_editable:
                 messagebox.showwarning("提醒","請先儲存匯出路徑設定。")
@@ -898,8 +1038,17 @@ class PDFMergerUI:
         except Exception as e:
             messagebox.showerror("錯誤", f"合併時發生錯誤：{e}")
             return
+        if self.merge_path_option.get()=="A":
+            output_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
 
-        output_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
+        elif self.merge_path_option.get()=="B":
+            if self.custom_merge_path.get() and Path(self.custom_merge_path.get()).exists():
+                original_path = self.custom_merge_path.get()+"\\"
+                output_path = get_unique_output_path(original_path)
+            else:
+                messagebox.showerror("匯出錯誤", "自訂路徑不存在。\n")
+                return
+            
         if output_path:
             with open(output_path, "wb") as out_file:
                 writer.write(out_file)
@@ -971,7 +1120,7 @@ class PDFMergerUI:
 
             # 匯出至使用者自訂路徑
             else:
-                if Path(self.custom_split_path.get()).exists():
+                if self.custom_split_path.get() and Path(self.custom_split_path.get()).exists():
                     output_paths.extend( [self.custom_split_path.get()] * len(writers) )
                 else:
                     messagebox.showerror("匯出錯誤", "自訂路徑不存在。\n")
@@ -1075,6 +1224,35 @@ class PDFMergerUI:
         text_area.pack(padx=20, pady=10, fill="both", expand=True)
 
         return
+    def _register_click(self, widget, _visited=None):
+        if _visited is None:
+            _visited = set()
+    
+        widget_id = id(widget)
+        if widget_id in _visited:
+            return
+        _visited.add(widget_id)
+    
+        try:
+            origin_widget = widget
+        
+            if isinstance(widget, ctk.CTkScrollableFrame):
+                widget = widget._parent_canvas
+            elif isinstance(widget, ctk.CTkBaseClass):
+                widget = widget._canvas if hasattr(widget, "_canvas") else widget
+        
+            if widget is not None:
+                widget.drop_target_register(DND_FILES)
+                widget.bind("<Button-1>", lambda e: self._on_frame_click(e))
+        except Exception as e:
+            print(e)
+    
+        # 遞迴處理子元件
+        for child in origin_widget.winfo_children():
+            self._register_click(child, _visited)
+
+    def _on_frame_click(self, event):
+        self.manual_add_pdfs()
 
     def _register_drop(self, widget, _visited=None):
         """為區塊及區塊內所有元件註冊拖曳檔案事件"""
@@ -1096,8 +1274,10 @@ class PDFMergerUI:
 
             elif isinstance(widget, ctk.CTkBaseClass):
                 widget = widget._canvas if hasattr(widget, "_canvas") else None
-            widget.drop_target_register(DND_FILES)
-            widget.dnd_bind("<<Drop>>", self._on_files_drop)
+
+            if widget is not None:
+                widget.drop_target_register(DND_FILES)
+                widget.dnd_bind("<<Drop>>", lambda e: self._on_files_drop(e))
         except Exception as e:
             print(e)
     
@@ -1113,7 +1293,13 @@ class PDFMergerUI:
         file_paths = event.widget.tk.splitlist(event.data)
         self.add_pdfs(file_paths)
         
-        
+    def _refresh_main_body(self):
+        if self.pdf_files:
+            self.draggable_frame.pack_forget()
+            self.scrollable_frame.pack(side="left", expand=True, fill="both")
+        else:
+            self.scrollable_frame.pack_forget()
+            self.draggable_frame.pack(side="left", expand=True, fill="both")
         
 if __name__ == "__main__":
 
